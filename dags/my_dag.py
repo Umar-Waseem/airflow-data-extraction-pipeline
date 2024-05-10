@@ -1,3 +1,6 @@
+from airflow import DAG
+from datetime import datetime, timedelta
+from airflow.operators.python import PythonOperator
 import requests
 from bs4 import BeautifulSoup
 import csv
@@ -11,15 +14,11 @@ RESET = "\033[0m"
 
 def extract_data(url):
     start_time = time.strftime("%Y%m%d-%H%M%S")
-    # fetch html
-    print(f"\nExtracting data from {PURPLE}{url}{RESET}")
+    print(f"\nExtracting data from {url}")
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
     
-    # get links
     links = [link.get('href') for link in soup.find_all('a', href=True)]
-    
-    # get titles and descriptions
     articles = soup.find_all('article')
     article_data = []
     for idx, article in enumerate(articles):
@@ -27,40 +26,33 @@ def extract_data(url):
         description = article.find('p').text.strip() if article.find('p') else None
         article_data.append({'id': idx+1, 'title': title, 'description': description, 'source': url})
     
-    # extraction time duration
     end_time = time.strftime("%Y%m%d-%H%M%S")
-    print(f"Extracted data in {RED}{calculate_duration(start_time, end_time)}{RESET} seconds")
-
-    # amount of data extracted
-    print(f"Extracted {RED}{len(article_data)}{RESET} articles and {RED}{len(links)}{RESET} links from {PURPLE} {url} {RESET}")
+    print(f"Extracted data in {calculate_duration(start_time, end_time)} seconds")
+    print(f"Extracted {len(article_data)} articles and {len(links)} links from {url}")
     return links, article_data
 
 def save_to_csv(file_name, articles):
     with open(file_name, 'w', newline='', encoding='utf-8') as csvfile:
         fieldnames = ['id', 'title', 'description', 'source']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        
         writer.writeheader()
         for article in articles:
             writer.writerow(article)
 
 def preprocess(text):
-    # Remove HTML tags
     clean_text = re.sub('<.*?>', '', text)
-    # Remove special characters and digits
     clean_text = re.sub('[^a-zA-Z]', ' ', clean_text)
-    # Convert to lowercase
     clean_text = clean_text.lower()
-    # remove extra spaces
     clean_text = re.sub(' +', ' ', clean_text)
     return clean_text
 
-def clean_data(data, url):
-    print(f"Cleaning data from {PURPLE}{url}{RESET}\n")
+def clean_data(data):
+    cleaned_data = []
     for article in data:
         article['title'] = preprocess(article['title']) if article.get('title') else None
         article['description'] = preprocess(article['description']) if article.get('description') else None
-    return data
+        cleaned_data.append(article)
+    return cleaned_data
 
 def calculate_duration(start_time, end_time):
     start = time.strptime(start_time, "%Y%m%d-%H%M%S")
@@ -68,10 +60,69 @@ def calculate_duration(start_time, end_time):
     duration = time.mktime(end) - time.mktime(start)
     return duration
 
+urls = ['https://www.dawn.com/', 'https://www.bbc.com/']
+filename = "/mnt/d/Study/Mlops/airflow-data-extraction-pipeline/data/extracted.csv"
+
+def extract_data_task(urls):
+    print("Extract data task")
+    all_data = []
+    for url in urls:
+        links, articles = extract_data(url)
+        all_data.extend(articles)
+    return all_data
+
+def preprocess_data_task(data):
+    print("Preprocess data task")
+    cleaned_data = clean_data(data)
+    return cleaned_data
+
+def save_data_task(data, file_name):
+    print("Save data task")
+    save_to_csv(file_name, data)
+
+default_args = {
+    'owner': 'umar',
+}
+
+dag = DAG(
+    dag_id='assignment2_dag',
+    default_args=default_args,
+    description='mlops assignment 2 dag',
+    tags=['assignment2', 'mlops'],
+    catchup=False,
+    schedule=None,
+    start_date=datetime(2024, 5, 9),
+)
+
+with dag:
+    extract_task = PythonOperator(
+        task_id='extract_task',
+        python_callable=extract_data_task,
+        op_kwargs={'urls': urls},
+        provide_context=True
+    )
+
+    preprocess_task = PythonOperator(
+        task_id='preprocess_task',
+        python_callable=preprocess_data_task,
+        op_kwargs={'data': extract_task.output},
+        provide_context=True
+    )
+
+    save_task = PythonOperator(
+        task_id='save_task',
+        python_callable=save_data_task,
+        op_kwargs={'file_name': filename, 'data': preprocess_task.output},
+        provide_context=True
+    )
+
+extract_task >> preprocess_task >> save_task
+
+
 def main():
     dawn_url = 'https://www.dawn.com/'
     bbc_url = 'https://www.bbc.com/'
-    file_name = "./data/extracted.csv"
+    file_name = "/Users/umarwaseem/Desktop/airflow-data-extraction-pipeline/data/extracted.csv"
 
     dawn_links, dawn_articles = extract_data(dawn_url)
     dawn_data = clean_data(dawn_articles, dawn_url)
@@ -84,5 +135,5 @@ def main():
 
     print(f"Data saved to{GREEN} {file_name} {RESET}\n")
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
