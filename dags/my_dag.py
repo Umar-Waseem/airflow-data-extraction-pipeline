@@ -8,10 +8,15 @@ import re
 import time
 import os
 
+
+##### logging utilities
+
 PURPLE = "\033[94m"
 GREEN = "\033[92m"
 RED = "\033[91m"
 RESET = "\033[0m"
+
+##### lifecycle functions
 
 def extract_data(url):
     start_time = time.strftime("%Y%m%d-%H%M%S")
@@ -61,6 +66,9 @@ def calculate_duration(start_time, end_time):
     duration = time.mktime(end) - time.mktime(start)
     return duration
 
+
+##### airflow task specific functions
+
 def git_push():
     os.system('git add .')
     os.system('git commit -m "updated automatically by dvc"')
@@ -90,6 +98,9 @@ def save_data_task(data, file_name):
     print("Save data task")
     save_to_csv(file_name, data)
 
+
+######  dag specifications
+
 default_args = {
     'owner': 'umar',
 }
@@ -103,6 +114,8 @@ dag = DAG(
     schedule=None,
     start_date=datetime(2024, 5, 9),
 )
+
+###### airflow operators
 
 with dag:
     extract_task = PythonOperator(
@@ -136,8 +149,11 @@ with dag:
         python_callable=git_push,
     )
 
+# tasks execution order for airflow
 extract_task >> preprocess_task >> save_task >> dvc_push_task >> git_push_task
 
+
+### use to run the pipeline manually
 def main():
     dawn_url = 'https://www.dawn.com/'
     bbc_url = 'https://www.bbc.com/'
