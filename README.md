@@ -1,5 +1,5 @@
 # Airflow Data Extraction Pipeline
-This project automates a data extraction lifecycle from extracting data, transforming it, saving it to versioning the data with dvc and code with git.
+This project automates a data extraction lifecycle from extracting data, transforming it, saving it while versioning the data with dvc and code with git.
 
 ## How To Run?
 - Install the necessary libraries from `requirements.txt` file
