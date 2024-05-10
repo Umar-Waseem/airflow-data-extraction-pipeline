@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 import csv
 import re
 import time
+import os
 
 PURPLE = "\033[94m"
 GREEN = "\033[92m"
@@ -59,6 +60,15 @@ def calculate_duration(start_time, end_time):
     end = time.strptime(end_time, "%Y%m%d-%H%M%S")
     duration = time.mktime(end) - time.mktime(start)
     return duration
+
+def git_push():
+    os.system('git add .')
+    os.system('git commit -m "updated automatically by dvc"')
+    os.system('git push origin main')
+
+def dvc_push():
+    os.system('dvc add data/extracted.csv')
+    os.system('dvc push')
 
 urls = ['https://www.dawn.com/', 'https://www.bbc.com/']
 filename = "/mnt/d/Study/Mlops/airflow-data-extraction-pipeline/data/extracted.csv"
@@ -116,8 +126,17 @@ with dag:
         provide_context=True
     )
 
-extract_task >> preprocess_task >> save_task
+    dvc_push_task = PythonOperator(
+        task_id='dvc_push_task',
+        python_callable=dvc_push,
+    )
 
+    git_push_task = PythonOperator(
+        task_id='git_push_task',
+        python_callable=git_push,
+    )
+
+extract_task >> preprocess_task >> save_task >> dvc_push_task >> git_push_task
 
 def main():
     dawn_url = 'https://www.dawn.com/'
