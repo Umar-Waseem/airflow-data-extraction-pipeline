@@ -70,9 +70,15 @@ def calculate_duration(start_time, end_time):
 ##### airflow task specific functions
 
 def git_push():
+    os.system('git status')
+    os.system('git pull')
+    os.system('git status')
     os.system('git add .')
+    os.system('git status')
     os.system('git commit -m "updated automatically by dvc"')
+    os.system('git status')
     os.system('git push origin main')
+    os.system('git status')
 
 def dvc_push():
     os.system('dvc add data/extracted.csv')
